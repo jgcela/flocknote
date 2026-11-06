@@ -14,7 +14,7 @@ const NAV = [
   { href: "/giving", label: "Giving", Icon: GivingIcon },
 ];
 
-const MANAGER_NAV = [{ href: "/settings/team", label: "Team", Icon: TeamIcon }];
+const MANAGER_NAV = [{ href: "/settings/team", label: "Settings", Icon: TeamIcon }];
 
 export function Sidebar({ churchName, userName, canManageTeam }: { churchName: string; userName: string; canManageTeam: boolean }) {
   const pathname = usePathname();
@@ -34,7 +34,8 @@ export function Sidebar({ churchName, userName, canManageTeam }: { churchName: s
       <nav aria-label="Main" className="overflow-x-auto px-3 pb-3 lg:flex-1 lg:pb-0">
         <ul className="flex gap-1 lg:flex-col">
           {items.map(({ href, label, Icon }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`);
+            const section = href.startsWith("/settings") ? "/settings" : href;
+            const active = pathname === section || pathname.startsWith(`${section}/`);
             return (
               <li key={href}>
                 <Link

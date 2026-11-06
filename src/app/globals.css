@@ -55,3 +55,12 @@
     @apply inline-flex items-center rounded-full px-3 py-0.5 text-sm font-semibold;
   }
 }
+
+/* Printing (giving statements): hide app chrome, keep the document. */
+@media print {
+  body { background: #fff !important; }
+  .no-print, aside, nav { display: none !important; }
+  main { padding: 0 !important; }
+  .card { box-shadow: none !important; border: none !important; }
+  .print-page + .print-page { break-before: page; }
+}

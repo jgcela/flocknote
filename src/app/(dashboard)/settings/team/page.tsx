@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { ConfirmButton } from "@/components/form";
-import { Badge, PageHeader } from "@/components/ui";
+import { Badge, PageHeader, SubNav } from "@/components/ui";
 import { formatDate, titleCase } from "@/lib/format";
 import { requireTeamManager } from "@/lib/tenant";
+import { SETTINGS_NAV } from "../nav";
 import { changeRole, inviteUser, revokeInvitation, setAccess } from "./actions";
 import { InviteForm } from "./invite-form";
 
@@ -22,7 +23,8 @@ export default async function TeamPage() {
 
   return (
     <>
-      <PageHeader title="Team" description="People who can sign in and manage your church's information." />
+      <PageHeader title="Settings" description="People who can sign in and manage your church's information." />
+      <SubNav items={SETTINGS_NAV} current="/settings/team" />
 
       <section className="card mb-6 overflow-x-auto" aria-labelledby="team-heading">
         <h2 id="team-heading" className="px-6 pt-6 text-2xl font-bold">Who has access</h2>
