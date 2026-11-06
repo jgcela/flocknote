@@ -58,6 +58,20 @@ Check it with `npx tsx scripts/verify-tenancy.ts` after seeding.
 Member custom attributes are stored as JSON on `Member.customAttributes`,
 keyed by the church's `CustomFieldDefinition.key`.
 
+## Forms
+
+People, households and groups can be created, edited and deleted (groups are
+archived instead). Shared pieces live in `src/components/form.tsx` and
+`src/lib/form-state.ts`:
+
+- Every server action calls `requireTenant()` and writes through `tenantDb`,
+  and checks that any referenced household, parent or group belongs to the
+  same church before saving.
+- `ActionForm` submits in a transition, so fields are never cleared when
+  validation fails; errors appear under each field and are announced.
+- People with giving records can't be deleted (set them to Inactive instead).
+  Deleting a household keeps its people and gifts, just unlinked.
+
 ## Scripts
 
 | Command             | What it does                         |
@@ -72,7 +86,7 @@ keyed by the church's `CustomFieldDefinition.key`.
 
 ## Not built yet
 
-- Create/edit forms for people, groups, funds; message composer and sending
-  (no email/SMS provider is wired up yet)
+- Forms for funds and gifts; message composer and sending (no email/SMS
+  provider is wired up yet); editing custom field definitions
 - Staff invitations, password reset, login rate limiting
 - Giving statements (PDF) and online payments
