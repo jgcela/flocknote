@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Badge, EmptyState, PageHeader, SubNav } from "@/components/ui";
 import { displayName, titleCase } from "@/lib/format";
 import { requireTenant } from "@/lib/tenant";
@@ -20,7 +21,11 @@ export default async function PeoplePage() {
 
   return (
     <>
-      <PageHeader title="People & Households" description="Everyone in your church directory." />
+      <PageHeader
+        title="People & Households"
+        description="Everyone in your church directory."
+        actions={<Link href="/people/new" className="btn-primary no-underline">Add a person</Link>}
+      />
       <SubNav items={TABS} current="/people" />
       {members.length === 0 ? (
         <EmptyState title="No people yet">Add your first member to start building your directory.</EmptyState>
@@ -40,7 +45,9 @@ export default async function PeoplePage() {
             <tbody>
               {members.map((m) => (
                 <tr key={m.id}>
-                  <td className="font-semibold">{displayName(m)}</td>
+                  <td>
+                    <Link href={`/people/${m.id}`} className="font-semibold text-clay-700 underline">{displayName(m)}</Link>
+                  </td>
                   <td>
                     <div>{m.email ?? <span className="text-bark-500">No email</span>}</div>
                     <div className="text-bark-700">{m.phone ?? ""}</div>
