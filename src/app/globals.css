@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-size: 100%;
+  }
+  body {
+    @apply bg-cream-100 text-bark-900 font-sans text-base antialiased;
+  }
+  h1, h2, h3 {
+    @apply font-display text-bark-900;
+  }
+  :focus-visible {
+    @apply outline outline-[3px] outline-offset-2 outline-clay-600;
+  }
+  a {
+    @apply underline-offset-4;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-cream-300 bg-cream-50 shadow-card;
+  }
+  .btn {
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-primary {
+    @apply btn bg-clay-600 text-white hover:bg-clay-700;
+  }
+  .btn-secondary {
+    @apply btn border-2 border-bark-500 bg-cream-50 text-bark-900 hover:bg-cream-200;
+  }
+  .field-label {
+    @apply mb-1.5 block font-semibold text-bark-900;
+  }
+  .field-input {
+    @apply block min-h-12 w-full rounded-xl border-2 border-cream-300 bg-white px-4 py-2.5 text-base text-bark-900 placeholder:text-bark-500 focus:border-clay-600 focus:outline-none;
+  }
+  .data-table {
+    @apply w-full border-collapse text-left;
+  }
+  .data-table th {
+    @apply border-b-2 border-cream-300 px-4 py-3 text-sm font-bold uppercase tracking-wide text-bark-700;
+  }
+  .data-table td {
+    @apply border-b border-cream-200 px-4 py-3.5 align-top;
+  }
+  .data-table tbody tr:hover {
+    @apply bg-cream-100;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-3 py-0.5 text-sm font-semibold;
+  }
+}

@@ -1,0 +1,429 @@
+// Multi-tenant church management schema.
+//
+// Tenancy model: every tenant-owned row carries `organizationId`.
+// Cross-table references between tenant rows use COMPOSITE foreign keys
+// (id + organizationId), so PostgreSQL itself rejects a row that points at
+// another church's data. Application code additionally goes through
+// `tenantDb(orgId)` (src/lib/tenant-db.ts), which injects the filter.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Tenants & staff accounts
+// ─────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  timezone  String   @default("America/New_York")
+  email     String?
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  members          Member[]
+  households       Household[]
+  groups           Group[]
+  groupMemberships GroupMembership[]
+  parentalLinks    ParentalRelationship[]
+  customFields     CustomFieldDefinition[]
+  communications   Communication[]
+  commRecipients   CommunicationRecipient[]
+  funds            Fund[]
+  contributions    Contribution[]
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+/// A person who can sign in to the admin dashboard. Always bound to exactly
+/// one church; the session carries this organizationId.
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String       @unique
+  name           String
+  passwordHash   String
+  role           UserRole     @default(STAFF)
+  lastLoginAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  sentCommunications Communication[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// People
+// ─────────────────────────────────────────────────────────────
+
+model Household {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String // e.g. "The Garcia Family"
+  addressLine1   String?
+  addressLine2   String?
+  city           String?
+  region         String?
+  postalCode     String?
+  country        String?
+  homePhone      String?
+
+  /// The member who receives household-level mail, statements, etc.
+  primaryContactId String?
+  primaryContact   Member? @relation("HouseholdPrimaryContact", fields: [primaryContactId, organizationId], references: [id, organizationId], onDelete: NoAction, onUpdate: NoAction)
+
+  members       Member[]       @relation("HouseholdMembers")
+  contributions Contribution[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([id, organizationId])
+  @@unique([primaryContactId, organizationId])
+  @@index([organizationId, name])
+}
+
+enum HouseholdRole {
+  HEAD
+  SPOUSE
+  CHILD
+  OTHER_ADULT
+  OTHER
+}
+
+enum MemberStatus {
+  ACTIVE
+  VISITOR
+  INACTIVE
+  DECEASED
+}
+
+enum ContactChannel {
+  EMAIL
+  SMS
+  BOTH
+  NONE
+}
+
+model Member {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  firstName     String
+  lastName      String
+  preferredName String?
+  email         String?
+  phone         String? // E.164, e.g. +15551234567
+  birthDate     DateTime?    @db.Date
+  status        MemberStatus @default(ACTIVE)
+
+  // Subscription / contact preferences (church-wide). Per-group overrides
+  // live on GroupMembership.
+  emailOptIn       Boolean        @default(true)
+  smsOptIn         Boolean        @default(false)
+  preferredChannel ContactChannel @default(EMAIL)
+  unsubscribedAt   DateTime?
+
+  /// Values keyed by CustomFieldDefinition.key, e.g. { "tshirt_size": "M" }.
+  customAttributes Json @default("{}")
+
+  householdId   String?
+  household     Household?     @relation("HouseholdMembers", fields: [householdId, organizationId], references: [id, organizationId], onDelete: NoAction, onUpdate: NoAction)
+  householdRole HouseholdRole?
+
+  primaryContactOf Household?               @relation("HouseholdPrimaryContact")
+  childLinks       ParentalRelationship[]   @relation("ParentLinks")
+  parentLinks      ParentalRelationship[]   @relation("ChildLinks")
+  groupMemberships GroupMembership[]
+  messagesReceived CommunicationRecipient[]
+  contributions    Contribution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, email])
+  @@index([organizationId, lastName, firstName])
+  @@index([organizationId, householdId])
+}
+
+enum ParentalRelationshipType {
+  PARENT
+  STEP_PARENT
+  GUARDIAN
+  GRANDPARENT
+}
+
+/// Parent/guardian → child links. Kept separate from Household because
+/// children can have guardians in more than one household.
+model ParentalRelationship {
+  id                String                   @id @default(cuid())
+  organizationId    String
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentId          String
+  parent            Member                   @relation("ParentLinks", fields: [parentId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  childId           String
+  child             Member                   @relation("ChildLinks", fields: [childId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  type              ParentalRelationshipType @default(PARENT)
+  /// Authorized for pickup / receives communications about the child.
+  isPrimaryGuardian Boolean                  @default(false)
+  createdAt         DateTime                 @default(now())
+
+  @@unique([parentId, childId])
+  @@index([organizationId, childId])
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SELECT
+}
+
+/// Per-church definitions for Member.customAttributes.
+model CustomFieldDefinition {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  key            String
+  label          String
+  type           CustomFieldType @default(TEXT)
+  options        String[] // for SELECT
+  sortOrder      Int             @default(0)
+  createdAt      DateTime        @default(now())
+
+  @@unique([organizationId, key])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Groups / ministries
+// ─────────────────────────────────────────────────────────────
+
+enum GroupType {
+  MINISTRY
+  SMALL_GROUP
+  CLASS
+  COMMITTEE
+  VOLUNTEER_TEAM
+  OTHER
+}
+
+model Group {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  type           GroupType    @default(MINISTRY)
+  /// Members may self-subscribe when true.
+  isPublic       Boolean      @default(true)
+  archivedAt     DateTime?
+
+  parentGroupId String?
+  parentGroup   Group?  @relation("SubGroups", fields: [parentGroupId, organizationId], references: [id, organizationId], onDelete: NoAction, onUpdate: NoAction)
+  subGroups     Group[] @relation("SubGroups")
+
+  memberships    GroupMembership[]
+  communications Communication[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, name])
+}
+
+enum GroupRole {
+  MEMBER
+  LEADER
+  ADMIN
+}
+
+/// A member's subscription to a group, with per-channel preferences.
+model GroupMembership {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  groupId        String
+  group          Group        @relation(fields: [groupId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  memberId       String
+  member         Member       @relation(fields: [memberId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  role           GroupRole    @default(MEMBER)
+  emailEnabled   Boolean      @default(true)
+  smsEnabled     Boolean      @default(false)
+  subscribedAt   DateTime     @default(now())
+  unsubscribedAt DateTime?
+
+  @@unique([groupId, memberId])
+  @@index([organizationId, memberId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Communications (email + SMS broadcast log)
+// ─────────────────────────────────────────────────────────────
+
+enum CommunicationChannel {
+  EMAIL
+  SMS
+}
+
+enum CommunicationStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+  CANCELED
+}
+
+model Communication {
+  id             String               @id @default(cuid())
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channel        CommunicationChannel
+  status         CommunicationStatus  @default(DRAFT)
+  subject        String? // email only
+  body           String
+
+  /// Target group; null means a church-wide broadcast.
+  groupId String?
+  group   Group?  @relation(fields: [groupId, organizationId], references: [id, organizationId], onDelete: NoAction, onUpdate: NoAction)
+
+  sentById String?
+  sentBy   User?   @relation(fields: [sentById, organizationId], references: [id, organizationId], onDelete: NoAction, onUpdate: NoAction)
+
+  scheduledFor   DateTime?
+  sentAt         DateTime?
+  recipientCount Int       @default(0)
+  deliveredCount Int       @default(0)
+  failedCount    Int       @default(0)
+
+  recipients CommunicationRecipient[]
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+
+  @@unique([id, organizationId])
+  @@index([organizationId, createdAt])
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  OPENED
+  BOUNCED
+  FAILED
+  UNSUBSCRIBED
+}
+
+/// One row per person per broadcast: the delivery log.
+model CommunicationRecipient {
+  id                String         @id @default(cuid())
+  organizationId    String
+  organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  communicationId   String
+  communication     Communication  @relation(fields: [communicationId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  memberId          String?
+  member            Member?        @relation(fields: [memberId, organizationId], references: [id, organizationId], onDelete: NoAction, onUpdate: NoAction)
+  /// Address used at send time (email or E.164 phone), kept for audit.
+  address           String
+  status            DeliveryStatus @default(QUEUED)
+  providerMessageId String?
+  errorMessage      String?
+  deliveredAt       DateTime?
+  openedAt          DateTime?
+  createdAt         DateTime       @default(now())
+
+  @@unique([communicationId, address])
+  @@index([organizationId, memberId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Giving
+// ─────────────────────────────────────────────────────────────
+
+enum FundType {
+  GENERAL
+  CAMPAIGN
+  DESIGNATED
+}
+
+model Fund {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  type            FundType     @default(GENERAL)
+  isTaxDeductible Boolean      @default(true)
+  goalCents       Int?
+  startsOn        DateTime?    @db.Date
+  endsOn          DateTime?    @db.Date
+  isActive        Boolean      @default(true)
+
+  contributions Contribution[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, name])
+}
+
+enum PaymentMethod {
+  CASH
+  CHECK
+  CARD
+  ACH
+  ONLINE
+  OTHER
+}
+
+model Contribution {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Giver. Either may be null for anonymous/loose-plate gifts.
+  memberId    String?
+  member      Member?    @relation(fields: [memberId, organizationId], references: [id, organizationId], onDelete: NoAction, onUpdate: NoAction)
+  householdId String?
+  household   Household? @relation(fields: [householdId, organizationId], references: [id, organizationId], onDelete: NoAction, onUpdate: NoAction)
+
+  fundId String
+  fund   Fund   @relation(fields: [fundId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  /// Stored in minor units (cents) to avoid floating-point errors.
+  amountCents Int
+  currency    String        @default("USD")
+  receivedOn  DateTime      @db.Date
+  /// Year the gift counts toward for tax statements (usually year of receivedOn).
+  taxYear     Int
+  method      PaymentMethod @default(OTHER)
+  checkNumber String?
+  reference   String? // processor transaction id
+  note        String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([organizationId, taxYear])
+  @@index([organizationId, memberId, taxYear])
+  @@index([organizationId, fundId])
+}
