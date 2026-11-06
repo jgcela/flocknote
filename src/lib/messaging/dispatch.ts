@@ -93,6 +93,23 @@ export async function dispatchCommunication(organizationId: string, communicatio
   });
   if (!comm || comm.status !== "SENDING") return;
 
+  // A missing/invalid provider setting must show up in the delivery log,
+  // not leave the broadcast stuck in "Queued" forever.
+  try {
+    if (comm.channel === "EMAIL") getEmailProvider();
+    else getSmsProvider();
+    appUrl(); // unsubscribe links and Twilio callbacks need the site's address
+  } catch (e) {
+    const error = `Not sent: ${e instanceof Error ? e.message : String(e)}`;
+    console.error("[messaging] dispatch failed", error);
+    await db.communicationRecipient.updateMany({
+      where: { communicationId, status: "QUEUED" },
+      data: { status: "FAILED", errorMessage: error.slice(0, 500), claimToken: null },
+    });
+    await refreshCommunicationTotals(db, communicationId);
+    return;
+  }
+
   if (comm.channel === "EMAIL") {
     const provider = getEmailProvider();
     for (;;) {
@@ -184,4 +201,20 @@ export async function queueCommunication(organizationId: string, communicationId
     db.communication.update({ where: { id: communicationId }, data: { status: recipients.length ? "SENDING" : "FAILED", recipientCount: recipients.length } }),
   ]);
   return recipients.length;
+}
+
+/**
+ * Put failed and stuck rows back in the queue and send them now. Bounces and
+ * opt-outs are never retried.
+ */
+export async function retryCommunication(organizationId: string, communicationId: string) {
+  const db = tenantDb(organizationId);
+  const comm = await db.communication.findUnique({ where: { id: communicationId }, select: { status: true } });
+  if (!comm || !["SENDING", "SENT", "FAILED"].includes(comm.status)) return;
+  await db.communicationRecipient.updateMany({
+    where: { communicationId, status: { in: ["FAILED", "QUEUED"] } },
+    data: { status: "QUEUED", errorMessage: null, claimToken: null, claimedAt: null },
+  });
+  await db.communication.update({ where: { id: communicationId }, data: { status: "SENDING" } });
+  await dispatchCommunication(organizationId, communicationId);
 }
