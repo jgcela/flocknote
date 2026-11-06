@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ConfirmButton } from "@/components/form";
 import { Badge, PageHeader, StatCard } from "@/components/ui";
 import { displayName, formatDate, titleCase } from "@/lib/format";
 import { requireTenant } from "@/lib/tenant";
+import { retryMessage } from "../actions";
 
 export const metadata: Metadata = { title: "Message" };
 
@@ -33,17 +35,31 @@ export default async function MessagePage({ params }: { params: Promise<{ id: st
   });
   if (!m) notFound();
   const queued = m.recipients.filter((r) => r.status === "QUEUED").length;
+  const failed = m.recipients.filter((r) => r.status === "FAILED").length;
+  const retryable = queued + failed;
 
   return (
     <>
       <PageHeader
         title={m.subject ?? "Text message"}
         description={`${m.channel === "SMS" ? "Text" : "Email"} to ${m.group?.name ?? "the whole church"}${m.sentBy ? ` · by ${m.sentBy.name}` : ""} · ${formatDate(m.sentAt ?? m.createdAt)}`}
-        actions={<Link href="/messages" className="btn-secondary no-underline">All messages</Link>}
+        actions={
+          <>
+            {retryable > 0 && m.status !== "DRAFT" && m.status !== "SCHEDULED" ? (
+              <ConfirmButton
+                action={retryMessage.bind(null, m.id)}
+                label={`Send to ${retryable} again`}
+                confirmText={`Try sending to the ${retryable} ${retryable === 1 ? "person" : "people"} who haven't received it yet?`}
+                className="btn-primary"
+              />
+            ) : null}
+            <Link href="/messages" className="btn-secondary no-underline">All messages</Link>
+          </>
+        }
       />
       {m.status === "SENDING" ? (
         <p role="status" className="mb-6 rounded-xl bg-sky-50 px-4 py-3 text-sky-700">
-          Sending… {queued} still in the queue. Refresh to see progress.
+          Sending… {queued} still in the queue. Refresh to see progress. If this doesn&apos;t change after a minute, use &ldquo;Send again&rdquo;.
         </p>
       ) : null}
       <section aria-label="Totals" className="mb-6 grid gap-5 sm:grid-cols-3">

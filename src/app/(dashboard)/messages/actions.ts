@@ -7,7 +7,9 @@ import { z } from "zod";
 import { optionalId, zodErrors, type FormState } from "@/lib/form-state";
 import { resolveRecipients } from "@/lib/messaging/audience";
 import { SMS_MAX } from "@/lib/messaging/limits";
-import { dispatchCommunication, queueCommunication } from "@/lib/messaging/dispatch";
+import { getEmailProvider, getSmsProvider } from "@/lib/messaging";
+import { dispatchCommunication, queueCommunication, retryCommunication } from "@/lib/messaging/dispatch";
+import { appUrl } from "@/lib/request-meta";
 import { requireTenant } from "@/lib/tenant";
 
 const schema = z
@@ -29,6 +31,14 @@ export async function sendMessage(_prev: FormState, formData: FormData): Promise
   const parsed = schema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return zodErrors(parsed.error);
   const { channel, groupId, subject, body } = parsed.data;
+
+  try {
+    if (channel === "EMAIL") getEmailProvider();
+    else getSmsProvider();
+    appUrl();
+  } catch (e) {
+    return { message: `${channel === "EMAIL" ? "Email" : "Text messaging"} isn't set up correctly: ${e instanceof Error ? e.message : String(e)}` };
+  }
 
   if (groupId && !(await db.group.findUnique({ where: { id: groupId }, select: { id: true } }))) {
     return { message: "Please fix the highlighted fields.", errors: { groupId: "That group no longer exists." } };
@@ -66,4 +76,15 @@ export async function countAudience(channel: "EMAIL" | "SMS", groupId: string | 
   const { db } = await requireTenant();
   if (channel !== "EMAIL" && channel !== "SMS") return 0;
   return (await resolveRecipients(db, channel, groupId || null)).length;
+}
+
+/** Re-send failed or stuck recipients of one message, inside this request. */
+export async function retryMessage(communicationId: string): Promise<FormState> {
+  const { db, organization } = await requireTenant();
+  if (!(await db.communication.findUnique({ where: { id: communicationId }, select: { id: true } }))) return { message: "Message not found." };
+  await retryCommunication(organization.id, communicationId);
+  revalidatePath(`/messages/${communicationId}`);
+  revalidatePath("/messages");
+  const failed = await db.communicationRecipient.count({ where: { communicationId, status: "FAILED" } });
+  return failed ? { message: `${failed} still failed. See the error next to each person.` } : { notice: "Sent." };
 }
