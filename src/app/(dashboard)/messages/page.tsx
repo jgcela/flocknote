@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
 import { formatDate, titleCase } from "@/lib/format";
 import { requireTenant } from "@/lib/tenant";
@@ -17,7 +18,11 @@ export default async function MessagesPage() {
 
   return (
     <>
-      <PageHeader title="Messages" description="Every email and text sent to your church, with delivery results." />
+      <PageHeader
+        title="Messages"
+        description="Every email and text sent to your church, with delivery results."
+        actions={<Link href="/messages/new" className="btn-primary no-underline">New message</Link>}
+      />
       {messages.length === 0 ? (
         <EmptyState title="No messages yet">Emails and texts you send will be logged here.</EmptyState>
       ) : (
@@ -37,7 +42,7 @@ export default async function MessagesPage() {
               {messages.map((m) => (
                 <tr key={m.id}>
                   <td>
-                    <div className="font-semibold">{m.subject ?? m.body.slice(0, 70)}</div>
+                    <Link href={`/messages/${m.id}`} className="font-semibold text-clay-700 underline">{m.subject ?? m.body.slice(0, 70)}</Link>
                     {m.sentBy ? <div className="text-sm text-bark-700">by {m.sentBy.name}</div> : null}
                   </td>
                   <td>{m.channel === "SMS" ? "Text" : "Email"}</td>

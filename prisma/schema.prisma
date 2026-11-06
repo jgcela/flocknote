@@ -41,6 +41,7 @@ model Organization {
   commRecipients   CommunicationRecipient[]
   funds            Fund[]
   contributions    Contribution[]
+  invitations      UserInvitation[]
 }
 
 enum UserRole {
@@ -52,21 +53,73 @@ enum UserRole {
 /// A person who can sign in to the admin dashboard. Always bound to exactly
 /// one church; the session carries this organizationId.
 model User {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  email          String       @unique
-  name           String
-  passwordHash   String
-  role           UserRole     @default(STAFF)
-  lastLoginAt    DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email             String       @unique
+  name              String
+  passwordHash      String
+  role              UserRole     @default(STAFF)
+  lastLoginAt       DateTime?
+  /// Sessions issued before this moment are rejected (set on password reset).
+  passwordChangedAt DateTime?
+  /// Access removed by an administrator. Kept (not deleted) so the messages
+  /// this person sent stay attributed to them.
+  disabledAt        DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   sentCommunications Communication[]
+  sentInvitations    UserInvitation[]
+  passwordResets     PasswordResetToken[]
 
   @@unique([id, organizationId])
   @@index([organizationId])
+}
+
+/// Pending invitation for a new staff login. Only a SHA-256 hash of the
+/// emailed token is stored, so a database leak does not expose usable links.
+model UserInvitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  name           String?
+  role           UserRole     @default(STAFF)
+  tokenHash      String       @unique
+  invitedById    String?
+  invitedBy      User?        @relation(fields: [invitedById, organizationId], references: [id, organizationId], onDelete: NoAction, onUpdate: NoAction)
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, email])
+}
+
+/// One-time password reset link (hash only, short-lived).
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+/// Failed sign-in / reset attempts, used for rate limiting. Keys look like
+/// "login:email:<email>" or "login:ip:<ip>". Stored in Postgres so limits hold
+/// across server instances. Rows older than a day are pruned.
+model AuthThrottle {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+  @@index([createdAt])
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -350,10 +403,16 @@ model CommunicationRecipient {
   errorMessage      String?
   deliveredAt       DateTime?
   openedAt          DateTime?
+  /// Set by the sender that is working on this row, so two workers (the
+  /// request that queued it and the cron fallback) never send it twice.
+  claimToken        String?
+  claimedAt         DateTime?
   createdAt         DateTime       @default(now())
 
   @@unique([communicationId, address])
   @@index([organizationId, memberId])
+  @@index([providerMessageId])
+  @@index([communicationId, status])
 }
 
 // ─────────────────────────────────────────────────────────────

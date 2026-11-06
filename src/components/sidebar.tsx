@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Logo } from "./logo";
-import { GivingIcon, GroupsIcon, HomeIcon, MessagesIcon, PeopleIcon } from "./nav-icons";
+import { GivingIcon, GroupsIcon, HomeIcon, MessagesIcon, PeopleIcon, TeamIcon } from "./nav-icons";
 
 const NAV = [
   { href: "/dashboard", label: "Home", Icon: HomeIcon },
@@ -14,8 +14,11 @@ const NAV = [
   { href: "/giving", label: "Giving", Icon: GivingIcon },
 ];
 
-export function Sidebar({ churchName, userName }: { churchName: string; userName: string }) {
+const MANAGER_NAV = [{ href: "/settings/team", label: "Team", Icon: TeamIcon }];
+
+export function Sidebar({ churchName, userName, canManageTeam }: { churchName: string; userName: string; canManageTeam: boolean }) {
   const pathname = usePathname();
+  const items = canManageTeam ? [...NAV, ...MANAGER_NAV] : NAV;
 
   return (
     <aside className="border-b-2 border-cream-300 bg-cream-50 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-72 lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r-2">
@@ -30,7 +33,7 @@ export function Sidebar({ churchName, userName }: { churchName: string; userName
 
       <nav aria-label="Main" className="overflow-x-auto px-3 pb-3 lg:flex-1 lg:pb-0">
         <ul className="flex gap-1 lg:flex-col">
-          {NAV.map(({ href, label, Icon }) => {
+          {items.map(({ href, label, Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
               <li key={href}>

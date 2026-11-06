@@ -4,6 +4,7 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { loginErrorMessage } from "@/lib/auth-messages";
 
 function safeCallback(url?: string) {
   // Only follow same-origin URLs, to prevent open redirects.
@@ -17,7 +18,16 @@ function safeCallback(url?: string) {
   return "/dashboard";
 }
 
-export function LoginForm({ registered, callbackUrl }: { registered: boolean; callbackUrl?: string }) {
+const NOTICES = {
+  registered: "Your church is set up. Please sign in.",
+  invited: "Your account is ready. Please sign in.",
+  reset: "Your password has been changed. Please sign in with the new one.",
+  expired: "Your password was changed, so please sign in again.",
+} as const;
+
+export type LoginNotice = keyof typeof NOTICES;
+
+export function LoginForm({ notice, callbackUrl }: { notice?: LoginNotice; callbackUrl?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -34,7 +44,7 @@ export function LoginForm({ registered, callbackUrl }: { registered: boolean; ca
     });
     setPending(false);
     if (!result || result.error) {
-      setError("That email and password don't match our records. Please try again.");
+      setError(loginErrorMessage(result?.error ?? ""));
       return;
     }
     router.push(safeCallback(callbackUrl));
@@ -44,9 +54,9 @@ export function LoginForm({ registered, callbackUrl }: { registered: boolean; ca
   return (
     <>
       <h1 className="mb-6 text-3xl font-bold">Welcome back</h1>
-      {registered ? (
+      {notice ? (
         <p role="status" className="mb-5 rounded-xl bg-meadow-50 px-4 py-3 text-meadow-700">
-          Your church is set up. Please sign in.
+          {NOTICES[notice]}
         </p>
       ) : null}
       <form onSubmit={onSubmit} method="post" className="space-y-5" noValidate>
@@ -55,7 +65,10 @@ export function LoginForm({ registered, callbackUrl }: { registered: boolean; ca
           <input id="email" name="email" type="email" autoComplete="email" required className="field-input" />
         </div>
         <div>
-          <label htmlFor="password" className="field-label">Password</label>
+          <div className="flex items-baseline justify-between gap-3">
+            <label htmlFor="password" className="field-label">Password</label>
+            <Link href="/forgot-password" className="font-semibold text-clay-700 underline">Forgot password?</Link>
+          </div>
           <input id="password" name="password" type="password" autoComplete="current-password" required className="field-input" />
         </div>
         {error ? (
