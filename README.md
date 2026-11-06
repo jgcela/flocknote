@@ -30,6 +30,23 @@ Demo logins created by the seed (password `demo-password-123`):
 
 Or create a new church at `/signup`.
 
+## Deploying (Vercel + Neon)
+
+1. Create a Postgres database on [Neon](https://neon.tech) (or Supabase) and
+   copy its **direct** (non-pooled) connection string. It must end with
+   `?sslmode=require`.
+2. Import this repo in [Vercel](https://vercel.com/new). Framework preset:
+   Next.js; leave build settings as they are.
+3. Add environment variables in Vercel before the first deploy:
+   - `DATABASE_URL`: the connection string from step 1
+   - `NEXTAUTH_SECRET`: output of `openssl rand -base64 32`
+   - `NEXTAUTH_URL`: the site URL, e.g. `https://your-app.vercel.app`
+4. Deploy. Vercel runs `npm run vercel-build`, which applies pending
+   migrations (`prisma migrate deploy`) before building.
+5. Open `/signup` to create the first church. Demo data is not loaded in
+   production; to load it anyway, run `npm run db:seed` locally with
+   `DATABASE_URL` pointing at the production database.
+
 ## How tenant isolation works
 
 1. **Session** — every staff `User` belongs to exactly one `Organization`. The
