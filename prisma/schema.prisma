@@ -403,10 +403,16 @@ model CommunicationRecipient {
   errorMessage      String?
   deliveredAt       DateTime?
   openedAt          DateTime?
+  /// Set by the sender that is working on this row, so two workers (the
+  /// request that queued it and the cron fallback) never send it twice.
+  claimToken        String?
+  claimedAt         DateTime?
   createdAt         DateTime       @default(now())
 
   @@unique([communicationId, address])
   @@index([organizationId, memberId])
+  @@index([providerMessageId])
+  @@index([communicationId, status])
 }
 
 // ─────────────────────────────────────────────────────────────
