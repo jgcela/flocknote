@@ -3,7 +3,10 @@ import { z } from "zod";
 
 /** Result returned by every form server action. */
 export type FormState = {
+  /** Error summary shown above the form. */
   message?: string;
+  /** Success message shown above the form. */
+  notice?: string;
   errors?: Record<string, string>;
 };
 

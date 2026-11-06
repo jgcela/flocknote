@@ -24,3 +24,6 @@ export const MessagesIcon = ({ className = "h-6 w-6" }: IconProps) => (
 export const GivingIcon = ({ className = "h-6 w-6" }: IconProps) => (
   <svg {...base} className={className}><path d="M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.6-7 10-7 10z" /></svg>
 );
+export const TeamIcon = ({ className = "h-6 w-6" }: IconProps) => (
+  <svg {...base} className={className}><circle cx="8" cy="15" r="3.5" /><path d="M10.5 12.5L19 4" /><path d="M16 7l2 2" /><path d="M14 9l1.5 1.5" /></svg>
+);

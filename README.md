@@ -58,6 +58,35 @@ Check it with `npx tsx scripts/verify-tenancy.ts` after seeding.
 Member custom attributes are stored as JSON on `Member.customAttributes`,
 keyed by the church's `CustomFieldDefinition.key`.
 
+## Accounts & sign-in security
+
+- **Team** (`/settings/team`, owners and administrators only): invite people by
+  email as Staff or Administrator, cancel pending invitations, change roles and
+  remove access. Removed people are signed out on their next request; their row
+  is kept so the messages they sent stay attributed. The owner can't be changed
+  from this page.
+- **Invitations and password resets** use single-use random tokens. Only a
+  SHA-256 hash is stored. Invitations last 7 days, reset links 1 hour. Links are
+  built from `APP_URL` (or `NEXTAUTH_URL`), never from the request's Host header.
+  The "forgot password" form answers the same way whether or not the email
+  exists.
+- **After a password reset**, sessions that signed in before the change stop
+  working (`User.passwordChangedAt` vs. the session's sign-in time).
+- **Rate limits** (`src/lib/rate-limit.ts`, stored in the `AuthThrottle` table so
+  they hold across server instances):
+
+  | What                | Limit                                                    |
+  | ------------------- | -------------------------------------------------------- |
+  | Sign-in failures    | 5 per email+IP / 15 min · 20 per email / hour · 50 per IP / hour |
+  | Reset emails        | 3 per email / hour · 10 per IP / hour                    |
+  | New church sign-ups | 5 per IP / hour                                          |
+
+  The client IP comes from `X-Forwarded-For`, so deploy behind a proxy that sets
+  it (Vercel, Fly, nginx). Without one, a client can fake its IP and only the
+  per-email limits apply.
+- Until a real email provider is configured, account emails are printed to the
+  server log (see `src/lib/messaging`).
+
 ## Forms
 
 People, households and groups can be created, edited and deleted (groups are

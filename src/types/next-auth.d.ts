@@ -8,6 +8,8 @@ declare module "next-auth" {
       organizationId: string;
       organizationName: string;
       role: UserRole;
+      /** Unix seconds when this session signed in. */
+      authTime?: number;
     } & DefaultSession["user"];
   }
 
@@ -25,5 +27,6 @@ declare module "next-auth/jwt" {
     organizationId: string;
     organizationName: string;
     role: UserRole;
+    authTime?: number;
   }
 }

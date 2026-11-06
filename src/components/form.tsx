@@ -54,6 +54,11 @@ export function ActionForm({
           {state.message}
         </p>
       ) : null}
+      {state.notice ? (
+        <p role="status" className="break-words rounded-xl bg-meadow-50 px-4 py-3 text-meadow-700">
+          {state.notice}
+        </p>
+      ) : null}
       {children(state)}
       <div className="flex flex-wrap items-center gap-3 pt-2">
         <button type="submit" className="btn-primary" disabled={pending}>

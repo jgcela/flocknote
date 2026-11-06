@@ -49,6 +49,19 @@ async function main() {
     await rejects(prisma.member.create({ data: { organizationId: b.id, householdId: householdA.id, firstName: "x", lastName: "y" } })),
   );
 
+  const userB = await prisma.user.findFirstOrThrow({ where: { organizationId: b.id } });
+  const inviteB = await prisma.userInvitation.create({
+    data: { organizationId: b.id, email: "verify-tenancy@example.test", tokenHash: `verify-${Date.now()}`, expiresAt: new Date(Date.now() + 60_000) },
+  });
+  check("invitations are scoped", (await dbA.userInvitation.findUnique({ where: { id: inviteB.id } })) === null);
+  check("cannot revoke another church's invitation", (await dbA.userInvitation.updateMany({ where: { id: inviteB.id }, data: { revokedAt: new Date() } })).count === 0);
+  check("cannot change another church's staff", (await dbA.user.updateMany({ where: { id: userB.id }, data: { disabledAt: new Date() } })).count === 0);
+  check(
+    "DB rejects invitation attributed to another church's user",
+    await rejects(prisma.userInvitation.create({ data: { organizationId: a.id, invitedById: userB.id, email: "x@example.test", tokenHash: `verify2-${Date.now()}`, expiresAt: new Date() } })),
+  );
+  await prisma.userInvitation.delete({ where: { id: inviteB.id } });
+
   const still = await prisma.member.findUniqueOrThrow({ where: { id: memberB.id } });
   check("other church's data unchanged", still.firstName === memberB.firstName);
 

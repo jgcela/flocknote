@@ -14,6 +14,7 @@ const TENANT_MODELS = new Set<string>([
   "CommunicationRecipient",
   "Fund",
   "Contribution",
+  "UserInvitation",
 ] satisfies Prisma.ModelName[]);
 
 const WHERE_OPERATIONS = new Set([
