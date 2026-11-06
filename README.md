@@ -108,6 +108,10 @@ preferred channel. Shared addresses get one copy.
 | Text    | Twilio (REST API, 5 at a time)  | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` or `TWILIO_MESSAGING_SERVICE_SID` |
 | Both    | Console (dev): prints to the log | none, used when the above are missing |
 
+Current setup: email via Resend; SMS stays on the console adapter until a
+Twilio account is set up (the Twilio adapter is ready and switches on when the
+`TWILIO_*` variables are set).
+
 Emails go out with the church's name as the sender name and the church's own
 email as reply-to.
 
@@ -130,6 +134,30 @@ Vercel Cron). It finishes interrupted broadcasts and sends scheduled ones.
 Check it with `npx tsx --conditions=react-server scripts/verify-messaging.ts`.
 The adapters are tested against a mocked HTTP layer; the webhook signature code
 was cross-checked against the official `twilio` and `svix` SDKs.
+
+## Giving
+
+Gifts are entered by hand (`/giving/new`): cash, checks, bank transfers, or
+online gifts taken elsewhere. There is no online payment processing.
+
+- **Record a gift.** "Stay on this page" is ticked by default, so a Sunday's
+  checks can be entered one after another. A gift from a person counts toward
+  their household unless another household is chosen. The tax year defaults to
+  the year received and can be overridden (e.g. a check mailed Dec 31).
+- **Funds** (`/giving/funds/...`): general, campaign (with goal and dates) or
+  designated; tax-deductible or not; inactive funds are hidden from new gifts.
+- **Year-end statements** (`/giving/statements?year=2026`): one per household,
+  or per person when the gift has no household. Only tax-deductible funds
+  count, and anonymous gifts are left out. Each statement can be viewed and
+  printed (`/giving/statements/2026/all` prints them all, one per page) or
+  emailed. Emailed statements go out regardless of newsletter opt-in, because
+  they are a tax record, and are logged under Messages.
+- **Church details** (`/settings/church`): address, tax ID and the closing
+  wording printed on statements. The default wording is US-style ("no goods or
+  services… other than intangible religious benefits"). Check what your country
+  requires with your accountant.
+
+Check it with `npx tsx scripts/verify-giving.ts`.
 
 ## Forms
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Badge, EmptyState, PageHeader, StatCard } from "@/components/ui";
 import { displayName, formatDate, formatMoney, titleCase } from "@/lib/format";
 import { requireTenant } from "@/lib/tenant";
@@ -27,7 +28,16 @@ export default async function GivingPage() {
 
   return (
     <>
-      <PageHeader title="Giving" description={`Donations recorded for the ${year} tax year.`} />
+      <PageHeader
+        title="Giving"
+        description={`Donations recorded for the ${year} tax year.`}
+        actions={
+          <>
+            <Link href="/giving/statements" className="btn-secondary no-underline">Year-end statements</Link>
+            <Link href="/giving/new" className="btn-primary no-underline">Record a gift</Link>
+          </>
+        }
+      />
 
       <section aria-label="Totals" className="grid gap-5 sm:grid-cols-2">
         <StatCard label={`Total given in ${year}`} value={formatMoney(totals._sum.amountCents ?? 0)} />
@@ -35,7 +45,10 @@ export default async function GivingPage() {
       </section>
 
       <section className="mt-10">
-        <h2 className="mb-4 text-2xl font-bold">Funds & campaigns</h2>
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="text-2xl font-bold">Funds & campaigns</h2>
+          <Link href="/giving/funds/new" className="font-semibold text-clay-700 underline">Add a fund</Link>
+        </div>
         {funds.length === 0 ? (
           <EmptyState title="No funds yet">Create a fund to start recording gifts.</EmptyState>
         ) : (
@@ -49,7 +62,9 @@ export default async function GivingPage() {
                     <Badge tone={f.type === "CAMPAIGN" ? "warm" : "info"}>{titleCase(f.type)}</Badge>
                     {!f.isTaxDeductible ? <Badge>Not tax-deductible</Badge> : null}
                   </div>
-                  <h3 className="mt-3 text-xl font-bold">{f.name}</h3>
+                  <h3 className="mt-3 text-xl font-bold">
+                    <Link href={`/giving/funds/${f.id}`} className="text-bark-900 underline decoration-cream-300 hover:decoration-clay-600">{f.name}</Link>
+                  </h3>
                   <p className="mt-1 font-display text-3xl font-bold">{formatMoney(amount)}</p>
                   {pct !== null && f.goalCents ? (
                     <div className="mt-3">
@@ -92,7 +107,9 @@ export default async function GivingPage() {
               <tbody>
                 {recent.map((c) => (
                   <tr key={c.id}>
-                    <td>{formatDate(c.receivedOn)}</td>
+                    <td>
+                      <Link href={`/giving/gifts/${c.id}`} className="font-semibold text-clay-700 underline">{formatDate(c.receivedOn)}</Link>
+                    </td>
                     <td>{c.member ? displayName(c.member) : (c.household?.name ?? "Anonymous")}</td>
                     <td>{c.fund.name}</td>
                     <td>{titleCase(c.method)}</td>

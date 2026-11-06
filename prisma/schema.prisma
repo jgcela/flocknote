@@ -20,15 +20,19 @@ datasource db {
 // ─────────────────────────────────────────────────────────────
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  timezone  String   @default("America/New_York")
-  email     String?
-  phone     String?
-  address   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  timezone    String   @default("America/New_York")
+  email       String?
+  phone       String?
+  address     String?
+  /// Shown on annual giving statements (e.g. US EIN).
+  taxId       String?
+  /// Closing text on giving statements; a US-style default is used when empty.
+  receiptNote String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   users            User[]
   members          Member[]

@@ -271,6 +271,15 @@ export function ConfirmButton({
         {pending ? "Working…" : label}
       </button>
       {state.message ? <span role="alert" className="font-semibold text-clay-700">{state.message}</span> : null}
+      {state.notice ? <span role="status" className="font-semibold text-meadow-700">{state.notice}</span> : null}
     </span>
+  );
+}
+
+export function PrintButton({ label = "Print" }: { label?: string }) {
+  return (
+    <button type="button" className="btn-secondary no-print" onClick={() => window.print()}>
+      {label}
+    </button>
   );
 }
